@@ -70,7 +70,50 @@ function linearize($partials) {
 
 // Std deviation
 
-function getStdDeviation($partials) {
+function getStdDeviation($partials, $linearParameters) {
+	$stdDeviationArr		= Array();
+
+	$linear_c			= $linearParameters["linear_c"];
+	$angular_c			= $linearParameters["angular_c"];
+	$x_vals				= $partials["x_vals"];
+	$y_vals				= $partials["y_vals"];
+	$dataset_size		= count($x_vals);
+
+	$std_dev_partials	= Array();
+
+	for($i = 0; $i < $dataset_size; $i++) {
+		$value				= powerTwo($y_vals[$i] - ($linear_c * $x_vals[$i] + $angular_c));
+
+		$std_dev_partials[]	= $value;
+	}
+
+	$std_dev_partials_sum		= array_sum($std_dev_partials);
+	$std_dev					= floatval($std_dev_partials_sum/($dataset_size - 2.0));
+
+	$stdDeviationArr["std_dev"]					= $std_dev;
+	$stdDeviationArr["std_dev_partials_sum"]	= $std_dev_partials_sum;
+	$stdDeviationArr["std_dev_partials"]		= $std_dev_partials;
+	
+	return $stdDeviationArr;
+}
+
+// Errors 
+
+function getErrors($partials, $linearParams, $stdDeviation) {
+	$errors				= Array();
+	$std_deviation		= $stdDeviation["std_dev"];
+	$m_xx				= $linearParams["m_xx"];
+	$x_sqr_vals_sum		= array_sum($partials["x_sqr_vals"]);
+	$x_vals				= $partials["x_vals"];
+	$dataset_size		= count($x_vals);
+
+	$error_linear		= sqrt(floatval($std_deviation/$m_xx));
+	$error_angular		= floatval($error_linear * sqrt($x_sqr_vals_sum/$dataset_size));
+
+	$errors["linear"]	= $error_linear;
+	$errors["angular"]	= $error_angular;
+
+	return $errors;
 }
 
 
@@ -100,9 +143,35 @@ foreach ($reports as $reportName => $dataset) {
 	}
 
 	$linearParams	= linearize($partials);
-	$stdDeviation	= getStdDeviation($partials);
+	$stdDeviation	= getStdDeviation($partials, $linearParams);
 	$errors			= getErrors($partials, $linearParams, $stdDeviation); 
+	$dataset_size	= count($partials["x_vals"]);
 
-	writeReport($linearParams, $stdDeviation, $stdDeviation, NULL);	
+	echo "Xi\t\tYi\t\tXi**2\t\tXi*Yi\t\t(Yi - (m'*Xi + b')**2)\n";
+	for ($i = 0; $i < $dataset_size; $i++) {
+		$index	= $i+1;
+	
+		$x			= $partials["x_vals"][$i];
+		$y			= $partials["y_vals"][$i];
+		$x_sqr		= $partials["x_sqr_vals"][$i];
+		$x_dot_y	= $partials["x_dot_y_vals"][$i];
+		$std_part	= $stdDeviation["std_dev_partials"][$i];
+
+		echo "$x\t\t";
+		echo "$y\t\t";
+		echo "$x_sqr\t\t";
+		echo "$x_dot_y\t\t";
+		echo "$std_part\t\t\n";
+	}
+
+	echo "\nMxx = " . $linearParams["m_xx"];
+	echo "\t\t\t\tMxy = " . $linearParams["m_xy"] . "\n";
+
+	echo "m' = " . $linearParams["linear_c"];
+	echo "\t\t\tb' = ". $linearParams["angular_c"] . "\n";
+
+	echo "em = " . $errors["linear"];
+	echo "\t\t\teb = " . $errors["angular"] . "\n";
+	
 }
 ?>
