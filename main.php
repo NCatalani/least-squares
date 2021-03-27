@@ -1,8 +1,4 @@
 <?php
-//include ("ajustment.php");
-//include ("errors.php");
-//include ("std_deviation.php");
-
 DEFINE ("DATASET_EMPTY",				-1);
 DEFINE ("DATASET_SIZE_DIFFERS",			-2);
 DEFINE ("DATASET_MISSING DIMENSION",	-3);
@@ -116,14 +112,58 @@ function getErrors($partials, $linearParams, $stdDeviation) {
 	return $errors;
 }
 
+// Log
+
+function applyLog10($dataset) {
+	$newDataset	= Array();	
+
+	foreach ($dataset as $key => $values) 
+		$newDataset[$key]		= array_map("log10", $values);
+
+	return $newDataset;
+}
+
+// Cos
+
+function cosSqr($value) {
+    $radVal = deg2rad($value);
+    $cos    = cos($radVal);
+
+    $res    = powerTwo($cos);
+
+    return $res;
+}
+
+function applyCosSqrToX($dataset) {
+	$newDataset	= Array();	
+
+	foreach ($dataset as $key => $values) {
+		if ($key == "x") 
+		    $newDataset[$key]		= array_map("cosSqr", $values);
+		else
+		    $newDataset["y"]		= $values;
+	}
+
+	return $newDataset;
+}
+
 
 // Main
 
 $reports	= json_decode(file_get_contents("data.json"), TRUE);
 
-foreach ($reports as $reportName => $dataset) {
+foreach ($reports as $reportName => $raw_dataset) {
 
 	echo "Processing report $reportName\n";
+
+	$dataset	= $raw_dataset;
+
+	if ($argv[1] == "--log10"){
+		$dataset	= applyLog10($raw_dataset);
+	}
+	else if ($argv[1] == "--cos**2") {
+		$dataset	= applyCosSqrToX($raw_dataset);
+	}
 
 	$partials		= getPartials($dataset);
 	if (!$partials) {
@@ -147,31 +187,33 @@ foreach ($reports as $reportName => $dataset) {
 	$errors			= getErrors($partials, $linearParams, $stdDeviation); 
 	$dataset_size	= count($partials["x_vals"]);
 
-	echo "Xi\t\tYi\t\tXi**2\t\tXi*Yi\t\t(Yi - (m'*Xi + b')**2)\n";
+	echo "Xi\t\t\tYi\t\t\tXi**2\t\t\tXi*Yi\t\t\t(Yi - (m'*Xi + b')**2)\n";
 	for ($i = 0; $i < $dataset_size; $i++) {
 		$index	= $i+1;
 	
-		$x			= $partials["x_vals"][$i];
-		$y			= $partials["y_vals"][$i];
-		$x_sqr		= $partials["x_sqr_vals"][$i];
-		$x_dot_y	= $partials["x_dot_y_vals"][$i];
-		$std_part	= $stdDeviation["std_dev_partials"][$i];
+		$x			= number_format($partials["x_vals"][$i], 4);
+		$y			= number_format($partials["y_vals"][$i], 4);
+		$x_sqr		= number_format($partials["x_sqr_vals"][$i], 4);
+		$x_dot_y	= number_format($partials["x_dot_y_vals"][$i], 4);
+		$std_part	= number_format($stdDeviation["std_dev_partials"][$i], 4);
 
-		echo "$x\t\t";
-		echo "$y\t\t";
-		echo "$x_sqr\t\t";
-		echo "$x_dot_y\t\t";
-		echo "$std_part\t\t\n";
+		echo "$x\t\t\t";
+		echo "$y\t\t\t";
+		echo "$x_sqr\t\t\t";
+		echo "$x_dot_y\t\t\t";
+		echo "$std_part\t\t\t\n";
 	}
 
-	echo "\nMxx = " . $linearParams["m_xx"];
-	echo "\t\t\t\tMxy = " . $linearParams["m_xy"] . "\n";
+	echo "\nMxx = " . number_format($linearParams["m_xx"], 4);
+	echo "\t\tMxy = " . number_format($linearParams["m_xy"], 4) . "\n";
 
-	echo "m' = " . $linearParams["linear_c"];
-	echo "\t\t\tb' = ". $linearParams["angular_c"] . "\n";
+	echo "m' = " . number_format($linearParams["linear_c"], 4);
+	echo "\t\tb' = ". number_format($linearParams["angular_c"], 4) . "\n";
 
-	echo "em = " . $errors["linear"];
-	echo "\t\t\teb = " . $errors["angular"] . "\n";
+	echo "em = " . number_format($errors["linear"], 4);
+	echo "\t\teb = " . number_format($errors["angular"], 4);
+	
+	echo "\t\tsigma**2 = " . number_format($stdDeviation["std_dev"], 4) . "\n";
 	
 }
 ?>
